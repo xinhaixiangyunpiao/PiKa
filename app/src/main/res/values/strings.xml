@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">PiKa</string>
+    <string name="select">选择图片</string>
+    <string name="transport">开始传输</string>
 </resources>
