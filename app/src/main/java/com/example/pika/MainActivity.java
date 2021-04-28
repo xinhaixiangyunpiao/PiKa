@@ -6,7 +6,13 @@ import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattServer;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
@@ -27,6 +33,7 @@ import com.wildma.pictureselector.PictureSelector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 public class MainActivity extends AppCompatActivity {
@@ -42,6 +49,9 @@ public class MainActivity extends AppCompatActivity {
     private static final long SCAN_PERIOD = 10000;
     private List<BluetoothDevice> devices = new ArrayList<BluetoothDevice>();
     private BluetoothDevice nrf52840;
+    private BluetoothGatt bluetoothGatt;
+    private BluetoothGattService bluetoothGattService;
+    private BluetoothGattCharacteristic bluetoothGattCharacteristic;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,7 +73,8 @@ public class MainActivity extends AppCompatActivity {
         transport.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                // 向服务发送信息
+                bluetoothGattCharacteristic.setValue("123456789");
             }
         });
 
@@ -84,7 +95,6 @@ public class MainActivity extends AppCompatActivity {
 
         // 开始扫描ble设备
         scanLeDevice(true);
-        Log.println(Log.INFO,"her","hahahahah");
     }
 
     @Override
@@ -138,11 +148,46 @@ public class MainActivity extends AppCompatActivity {
             if (!devices.contains(device)) {  //判断是否已经添加
                 devices.add(device);//也可以添加devices.getName()到列表，这里省略
                 if (device.getAddress().equals("D0:4A:81:A5:A5:D3")) {
-                    Toast toast = Toast.makeText(getApplicationContext(), "连接成功", Toast.LENGTH_SHORT);
-                    toast.show();
                     nrf52840 = device;
                     // 关闭ble设备扫描
                     scanLeDevice(false);
+                    bluetoothGatt = nrf52840.connectGatt(MainActivity.this, false, new BluetoothGattCallback() {
+                        @Override
+                        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                            super.onConnectionStateChange(gatt, status, newState);
+                            if(newState == BluetoothProfile.STATE_CONNECTED){
+                                Toast.makeText(getApplicationContext(), "连接成功", Toast.LENGTH_SHORT).show();
+                            }
+                            gatt.discoverServices(); // 搜索服务
+                            if(newState == BluetoothGatt.STATE_DISCONNECTED){
+                                Toast.makeText(getApplicationContext(), "连接断开", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+
+                        @Override
+                        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                            super.onServicesDiscovered(gatt, status);
+                            // 接收数据
+                            String service_UUID = "00001523-1212-efde-1523-785feabcd123"; //已知服务
+                            String characteristic_UUID = "00001525-1212-efde-1523-785feabcd123"; //已知特征
+                            bluetoothGattService = bluetoothGatt.getService(UUID.fromString(service_UUID));
+                            bluetoothGattCharacteristic = bluetoothGattService.getCharacteristic(UUID.fromString(characteristic_UUID));
+                            if(bluetoothGattCharacteristic != null){
+                                gatt.setCharacteristicNotification(bluetoothGattCharacteristic, true); // 启用onCharacteristicChanged，用于接收数据
+                                Toast.makeText(MainActivity.this, "服务建立成功", Toast.LENGTH_LONG).show();
+                            }else{
+                                Toast.makeText(MainActivity.this, "发现服务失败", Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                        }
+
+                        @Override
+                        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+                            super.onCharacteristicChanged(gatt, characteristic);
+                            // 发现服务后的响应
+
+                        }
+                    });
                 }
             }
         };
