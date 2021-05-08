@@ -27,6 +27,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.wildma.pictureselector.PictureBean;
@@ -40,10 +42,12 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_ENABLE_LOCATION = 1;
     private ImageView image;
-    private EditText editText;
+    private SeekBar seekBar;
+    private TextView textView;
     private Button select;
     private Button transport;
     private Button binary;
+    private Button reconnect;
     private BluetoothManager bluetoothManager;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothLeScanner bluetoothLeScanner;
@@ -58,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     private ImageUtil imageUtil;
     private PictureBean pictureBean;
     private byte[] image_transfer;
+    private int threshold = 127;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,7 +71,9 @@ public class MainActivity extends AppCompatActivity {
         image = findViewById(R.id.image);
         select = findViewById(R.id.select_button);
         transport = findViewById(R.id.transport_button);
-        editText = findViewById(R.id.threshold);
+        reconnect = findViewById(R.id.reconnect_button);
+        seekBar = findViewById(R.id.threshold);
+        textView = findViewById(R.id.threshold_text);
         binary = findViewById(R.id.process_button);
         imageUtil = new ImageUtil();
 
@@ -79,18 +86,24 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        binary.setOnClickListener(new View.OnClickListener() {
+        reconnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                bluetoothManager = null;
+                bluetoothAdapter = null;
+                bluetoothLeScanner = null;
+                devices.clear();
+                // 开始扫描设备
+                init();
+            }
+        });
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                threshold = (int)Math.round(progress);
+                textView.setText("阈值："+ Integer.toString(threshold));
                 // 设定阈值
-                int threshold = 125;
-                if(editText.getText().toString().equals("") == false){
-                    threshold = Integer.parseInt(editText.getText().toString());
-                    if (threshold < 0)
-                        threshold = 0;
-                    else if (threshold > 255)
-                        threshold = 255;
-                }
                 imageUtil.setThreshold(threshold);
 
                 // 显示二值化图片
@@ -98,12 +111,48 @@ public class MainActivity extends AppCompatActivity {
                     // 提取图片bitmap信息
                     Bitmap obmp = BitmapFactory.decodeFile(pictureBean.getPath());
                     // 转化为二值化bitmap
-                    Bitmap binary_image = imageUtil.zeroAndOne(obmp);
+                    image_transfer = imageUtil.getBinaryArray(obmp);
+//                    Bitmap binary_image = imageUtil.zeroAndOne(obmp);
+                    Bitmap binary_image = imageUtil.setZeroAndOne(image_transfer);
                     // 显示bitmap图片
                     image.setImageBitmap(binary_image);
                     // 构造传输数据 200*200 8bit一个byte共 25*200 bytes
-                    image_transfer = imageUtil.getBinaryArray(obmp);
+//                    image_transfer = imageUtil.getBinaryArray(obmp);
                 }
+                Log.i("image","二值化成功");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
+        binary.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 设定阈值
+                imageUtil.setThreshold(threshold);
+
+                // 显示二值化图片
+                if(pictureBean != null){
+                    // 提取图片bitmap信息
+                    Bitmap obmp = BitmapFactory.decodeFile(pictureBean.getPath());
+                    // 转化为二值化bitmap
+                    image_transfer = imageUtil.getBinaryArray(obmp);
+//                    Bitmap binary_image = imageUtil.zeroAndOne(obmp);
+                    Bitmap binary_image = imageUtil.setZeroAndOne(image_transfer);
+                    // 显示bitmap图片
+                    image.setImageBitmap(binary_image);
+                    // 构造传输数据 200*200 8bit一个byte共 25*200 bytes
+//                    image_transfer = imageUtil.getBinaryArray(obmp);
+                }
+                Log.i("image","二值化成功");
             }
         });
 
@@ -113,11 +162,24 @@ public class MainActivity extends AppCompatActivity {
                 // 向服务发送信息
                 if(bluetoothGattCharacteristic != null){
                     if(image_transfer != null){
-                        bluetoothGattCharacteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                        bluetoothGattCharacteristic.setValue(image_transfer);
-                        bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristic);
+                        byte[] bs = new byte[200];
+                        bluetoothGattCharacteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                        new Thread (new Runnable(){
+                            public void run() {
+                                try {
+                                    for (int i = 0; i < 5000; i += 200) {
+                                        System.arraycopy(image_transfer, i, bs, 0, 200);
+                                        bluetoothGattCharacteristic.setValue(bs);
+                                        boolean res = bluetoothGatt.writeCharacteristic(bluetoothGattCharacteristic);
+                                        Log.i("send", "发送状态: " + String.valueOf(res));
+                                        Thread.sleep(5);
+                                    }
+                                } catch (Exception e) {
+                                    Log.i("exception: ", e.getLocalizedMessage());
+                                }
+                            }
+                        }).start();
                         Toast.makeText(getApplicationContext(), "已发送", Toast.LENGTH_SHORT).show();
-                        System.out.println(image_transfer.length);
                     }else{
                         Toast.makeText(getApplicationContext(), "请先选择图片", Toast.LENGTH_SHORT).show();
                     }
@@ -157,6 +219,7 @@ public class MainActivity extends AppCompatActivity {
                     image.setImageURI(pictureBean.getUri());
                 }
             }
+            Log.i("image","图片选择成功");
         }
     }
 
@@ -217,10 +280,10 @@ public class MainActivity extends AppCompatActivity {
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
             if(newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.i("msg","连接成功");
+                Log.i("gatt","连接成功");
                 gatt.discoverServices(); // 搜索服务
             }else if(newState == BluetoothProfile.STATE_DISCONNECTED){
-                Log.i("msg","连接断开");
+                Log.i("gatt","连接断开");
             }
         }
 
@@ -228,18 +291,15 @@ public class MainActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
             // 接收数据
-            String service_UUID = "00001523-1212-efde-1523-785feabcd123"; //已知服务
-            String characteristic_UUID = "00001525-1212-efde-1523-785feabcd123"; //已知特征
+            String service_UUID = "00001523-1212-efde-1523-785feabcd123";         //已知服务
+            String characteristic_UUID = "00001525-1212-efde-1523-785feabcd123";  //已知特征
             bluetoothGattService = gatt.getService(UUID.fromString(service_UUID));
             bluetoothGattCharacteristic = bluetoothGattService.getCharacteristic(UUID.fromString(characteristic_UUID));
             if(bluetoothGattCharacteristic != null){
                 gatt.setCharacteristicNotification(bluetoothGattCharacteristic, true); // 启用onCharacteristicChanged，用于接收数据
-                Looper.prepare();
-                Toast.makeText(getApplicationContext(), "服务建立成功", Toast.LENGTH_SHORT).show();
-                Looper.loop();
-                Log.i("msg","服务建立成功");
+                Log.i("gatt","服务建立成功");
             }else{
-                Log.i("msg","服务建立失败");
+                Log.i("gatt","服务建立失败");
                 return;
             }
         }
@@ -247,17 +307,15 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicRead(gatt, characteristic, status);
+
         }
 
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt,characteristic,status);
-            if(status == BluetoothGatt.GATT_SUCCESS){
-                Log.i("msg","写入成功");
-            }else if(status == BluetoothGatt.GATT_FAILURE){
-                Log.i("msg","写入失败");
-            }else if(status == BluetoothGatt.GATT_WRITE_NOT_PERMITTED){
-                Log.i("msg","没有写入权限");
+            if(status != BluetoothGatt.GATT_SUCCESS){
+                Log.i("gatt","传输失败，重传");
+                gatt.writeCharacteristic(characteristic);
             }
         }
     };

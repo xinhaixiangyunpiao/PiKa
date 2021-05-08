@@ -22,6 +22,15 @@
             android:background="@drawable/bg_border" />
 
         <Button
+            android:id="@+id/reconnect_button"
+            android:layout_gravity="center_horizontal"
+            android:layout_width="100dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="10dp"
+            android:text="重新连接"
+            android:background="#FFB6C1" />
+
+        <Button
             android:id="@+id/select_button"
             android:layout_gravity="center_horizontal"
             android:layout_width="100dp"
@@ -30,14 +39,23 @@
             android:text="@string/select"
             android:background="#FFB6C1" />
 
-        <EditText
+        <SeekBar
             android:id="@+id/threshold"
+            android:layout_width="250dp"
+            android:layout_height="30dp"
             android:layout_gravity="center_horizontal"
-            android:layout_width="200dp"
-            android:layout_height="50dp"
-            android:layout_marginTop="10dp"
-            android:hint="请输入阈值（0~255）"
-            android:digits="1234567890.+-*/%\n()" />
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
+            android:thumb="@drawable/seek_bar_thumb"
+            android:max="255"
+            android:progress="127" />
+
+        <TextView
+            android:id="@+id/threshold_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="阈值：100"/>
 
         <Button
             android:id="@+id/process_button"

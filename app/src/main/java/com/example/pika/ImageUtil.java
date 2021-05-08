@@ -2,6 +2,7 @@ package com.example.pika;
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.util.Log;
 
 public class ImageUtil {
     private int threshold = 125;
@@ -99,6 +100,36 @@ public class ImageUtil {
         return bmp;//返回处理后的图像
     }
 
+    public Bitmap setZeroAndOne(byte[] img){
+
+        Bitmap bmp = Bitmap.createBitmap(200, 200
+                , Bitmap.Config.ARGB_8888);
+
+        int[] newPx = new int[200 * 200];//用来处理处理之后的每个像素点的颜色信息
+
+        int index = 0;
+        int cnt = 0;
+        int gray = 0;
+        for (int i = 0; i < 200 * 200; i++) {//循环处理图像中每个像素点的颜色值
+            int a = 0;
+            byte tt = img[index];
+            if((tt & ((byte)0x80 >> cnt)) == (byte)0x00){
+                gray = 0;
+            }else {
+                gray = 255;
+            }
+            if(cnt == 7){
+                index++;
+                cnt = 0;
+            }else{
+                cnt++;
+            }
+            newPx[i] = Color.argb(a, gray, gray, gray);//将处理后的透明度（没变），r,g,b分量重新合成颜色值并将其存储在数组中
+        }
+        bmp.setPixels(newPx, 0, 0, 0, 0, 0, 0);//将处理后的像素信息赋给新图
+        return bmp;//返回处理后的图像
+    }
+
     public void setThreshold(int threshold) {
         this.threshold = threshold;
     }
@@ -126,9 +157,9 @@ public class ImageUtil {
             int gray = (int) ((float) r * 0.3 + (float) g * 0.59 + (float) b * 0.11);
 
             if(gray <= threshold){
-                temp |= ((byte)0x00 << cnt);
+                temp |= ((byte)0x00 >> cnt);
             }else{
-                temp |= ((byte)0x01 << cnt);
+                temp |= ((byte)0x80 >> cnt);
             }
 
             if(cnt == 7){
@@ -138,6 +169,9 @@ public class ImageUtil {
             }else{
                 cnt++;
             }
+        }
+        for(int i = 0; i < res.length; i++){
+            Log.i("debug: ","line: "+String.valueOf(i/25)+" column: "+String.valueOf(i%25)+" value: "+res[i]);
         }
         return res;
     }
