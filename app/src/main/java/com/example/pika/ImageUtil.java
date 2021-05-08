@@ -111,7 +111,7 @@ public class ImageUtil {
         int cnt = 0;
         int gray = 0;
         for (int i = 0; i < 200 * 200; i++) {//循环处理图像中每个像素点的颜色值
-            int a = 0;
+            int a = 1;
             byte tt = img[index];
             if((tt & ((byte)0x80 >> cnt)) == (byte)0x00){
                 gray = 0;
