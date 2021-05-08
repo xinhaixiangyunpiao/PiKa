@@ -4,6 +4,8 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.util.Log;
 
+import java.util.Arrays;
+
 public class ImageUtil {
     private int threshold = 125;
 
@@ -108,30 +110,42 @@ public class ImageUtil {
         int[] newPx = new int[200 * 200];//用来处理处理之后的每个像素点的颜色信息
 
         int index = 0;
-        int cnt = 0;
-        int gray = 0;
+        int cnt = 0x80;
+        int gray;
+        byte tt;
         for (int i = 0; i < 200 * 200; i++) {//循环处理图像中每个像素点的颜色值
-            int a = 1;
-            byte tt = img[index];
-            if((tt & ((byte)0x80 >> cnt)) == (byte)0x00){
+            int a = 255;
+            tt = img[index];
+            if((tt & cnt) == 0x00){
                 gray = 0;
             }else {
                 gray = 255;
             }
-            if(cnt == 7){
+//            Log.i("debug", " index: " + String.valueOf(i) + " cnt: " + String.valueOf(cnt) +" no: " + String.valueOf(index) + " value: " + String.valueOf(gray));
+            newPx[i] = Color.argb(a, gray, gray, gray);   //将处理后的透明度（没变），r,g,b分量重新合成颜色值并将其存储在数组中
+
+            if(cnt == 0x01){
                 index++;
-                cnt = 0;
-            }else{
-                cnt++;
+                cnt = 0x80;
+            }else {
+                cnt = (cnt&0xff) >>> 1;
             }
-            newPx[i] = Color.argb(a, gray, gray, gray);//将处理后的透明度（没变），r,g,b分量重新合成颜色值并将其存储在数组中
         }
-        bmp.setPixels(newPx, 0, 0, 0, 0, 0, 0);//将处理后的像素信息赋给新图
+        bmp.setPixels(newPx, 0, 200, 0, 0, 200, 200);//将处理后的像素信息赋给新图
         return bmp;//返回处理后的图像
     }
 
     public void setThreshold(int threshold) {
         this.threshold = threshold;
+    }
+
+    public static byte[] getBooleanArray(byte b) {
+        byte[] array = new byte[8];
+        for (int i = 7; i >= 0; i--) {
+            array[i] = (byte)(b & 1);
+            b = (byte) (b >> 1);
+        }
+        return array;
     }
 
     // 二值化后返回
@@ -146,7 +160,7 @@ public class ImageUtil {
         int[] pxArray = new int[width * height]; //用来存储原图每个像素点的颜色信息
         bm.getPixels(pxArray, 0, width, 0, 0, width, height); //获取原图中的像素信息
 
-        int cnt = 0;
+        int cnt = 0x80;
         int index = 0;
         byte temp = (byte)0x00;
         for(int i = 0; i < width * height; i++){
@@ -157,22 +171,23 @@ public class ImageUtil {
             int gray = (int) ((float) r * 0.3 + (float) g * 0.59 + (float) b * 0.11);
 
             if(gray <= threshold){
-                temp |= ((byte)0x00 >> cnt);
+                temp |= 0x00;
             }else{
-                temp |= ((byte)0x80 >> cnt);
+                temp |= cnt;
             }
 
-            if(cnt == 7){
-                cnt = 0;
+            if(cnt == 0x01){
+                cnt = 0x80;
                 res[index++] = temp;
-                temp = (byte)0x00;
+                temp = 0x00;
             }else{
-                cnt++;
+                cnt = (cnt&0xff) >>> 1;
             }
         }
-        for(int i = 0; i < res.length; i++){
-            Log.i("debug: ","line: "+String.valueOf(i/25)+" column: "+String.valueOf(i%25)+" value: "+res[i]);
-        }
+//        Log.i("debug",  Arrays.toString(getBooleanArray(res[3218])));
+//        for(int i = 0; i < res.length; i++){
+//            Log.i("debug","index: " + String.valueOf(i) + " line: " + String.valueOf(i/25) + " column: "+String.valueOf(i%25) + " value: " + Arrays.toString(getBooleanArray(res[i])));
+//        }
         return res;
     }
 }
